@@ -1,0 +1,31 @@
+# --- Core FastAPI stack ---
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+pydantic==2.9.2
+pydantic-settings==2.5.2
+
+# --- Database ---
+pymongo==4.10.1
+motor==3.7.0                      # async MongoDB driver
+
+# --- Object storage ---
+supabase==2.31.0
+storage3==2.31.0
+
+# --- AI generation ---
+openai==1.54.0
+httpx==0.27.2
+
+# --- Google integrations ---
+gspread==6.1.4
+google-auth==2.35.0
+google-auth-oauthlib==1.2.1
+google-api-python-client==2.149.0
+
+# --- Migration script utilities ---
+rich==13.9.2                      # nice CLI output + progress bars
+python-dotenv==1.0.1
+tenacity==9.0.0                   # retries with backoff
+
+# --- Local package (editable) ---
+-e ../packages/dictionary_prompts

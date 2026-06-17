@@ -1,0 +1,41 @@
+# Secrets — never baked into Docker image
+**/.env
+**/.env.*
+!**/.env.example
+
+# Python artifacts
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/.pytest_cache/
+**/.mypy_cache/
+**/.venv/
+**/venv/
+
+# Node artifacts
+**/node_modules/
+frontend/dist/
+
+# Local MongoDB data
+backend/.local/
+backend/data/mongo_backup/
+
+# Git
+.git/
+.gitignore
+
+# macOS
+**/.DS_Store
+
+# Editor
+.cursor/
+**/.idea/
+**/.vscode/
+
+# Test / notebooks
+backend/tests/
+notebooks/
+m/
+
+# Google credentials
+**/google_service_account.json

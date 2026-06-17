@@ -1,0 +1,40 @@
+# Secrets — NEVER commit
+.env
+.env.local
+*.env
+google_service_account.json
+*-service-account.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Node (for frontend later)
+node_modules/
+dist/
+.next/
+.vite/
+
+# Data / backups / local MongoDB — never commit
+backend/data/
+backend/.local/
+
+# Logs
+*.log
+migration_*.log
