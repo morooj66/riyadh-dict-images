@@ -27,7 +27,7 @@ htmlcov/
 
 # Node (for frontend later)
 node_modules/
-dist/
+# dist/ is intentionally committed (pre-built for HF Spaces deployment)
 .next/
 .vite/
 
