@@ -1,8 +1,8 @@
 # --- Core FastAPI stack ---
 fastapi==0.115.0
 uvicorn[standard]==0.32.0
-pydantic==2.9.2
-pydantic-settings==2.5.2
+pydantic>=2.11.7
+pydantic-settings>=2.5.2
 
 # --- Database ---
 pymongo==4.10.1
