@@ -151,6 +151,66 @@ async def _try_mongo_ping(uri: str, tls_insecure: bool) -> dict:
         return {"connected": False, "error_type": type(exc).__name__, "hint": err_safe[:300]}
 
 
+@router.get("/storage-check", dependencies=[Depends(verify_api_key)])
+async def storage_check() -> dict:
+    """
+    Diagnostic: tests Supabase Storage access.
+    Returns bucket status and upload capability without exposing credentials.
+    """
+    import re
+    try:
+        from app.config import get_settings
+        from supabase import create_client
+        settings = get_settings()
+        client = create_client(settings.supabase_url, settings.supabase_service_key)
+        bucket_name = settings.supabase_bucket
+    except Exception as e:
+        return {"ok": False, "step": "init", "error": type(e).__name__, "hint": str(e)[:200]}
+
+    # Step 1: list buckets
+    try:
+        buckets = client.storage.list_buckets()
+        bucket_names = [b.name if hasattr(b, "name") else b.get("name") for b in buckets]
+        bucket_exists = bucket_name in bucket_names
+    except Exception as e:
+        err = re.sub(r"(key|token|secret)[=:\s]+\S+", "[REDACTED]", str(e), flags=re.I)
+        return {"ok": False, "step": "list_buckets", "error": type(e).__name__, "hint": err[:300]}
+
+    if not bucket_exists:
+        return {
+            "ok": False,
+            "step": "bucket_check",
+            "bucket": bucket_name,
+            "available_buckets": bucket_names,
+            "hint": f"Bucket '{bucket_name}' not found. Create it in Supabase → Storage.",
+        }
+
+    # Step 2: try uploading a tiny test file
+    try:
+        test_path = "_diagnostic/ping.txt"
+        test_data = b"ping"
+        client.storage.from_(bucket_name).upload(
+            path=test_path,
+            file=test_data,
+            file_options={"content-type": "text/plain", "upsert": "true"},
+        )
+        # Clean up
+        try:
+            client.storage.from_(bucket_name).remove([test_path])
+        except Exception:
+            pass
+        return {"ok": True, "bucket": bucket_name, "upload_test": "passed"}
+    except Exception as e:
+        err = re.sub(r"(key|token|secret)[=:\s]+\S+", "[REDACTED]", str(e), flags=re.I)
+        return {
+            "ok": False,
+            "step": "upload_test",
+            "bucket": bucket_name,
+            "error": type(e).__name__,
+            "hint": err[:400],
+        }
+
+
 @router.get("/stats", response_model=StatsResponse, dependencies=[Depends(verify_api_key)])
 async def stats(db: AsyncIOMotorDatabase = Depends(get_async_db)) -> StatsResponse:
     data = await entry_service.get_stats(db)

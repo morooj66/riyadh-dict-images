@@ -20,6 +20,7 @@ from dictionary_prompts.classifier import PromptFamily
 
 
 def generation_error_message(exc: Exception) -> str:
+    import re
     if isinstance(exc, AuthenticationError):
         return "فشل توليد الصورة من OpenAI — تحقق من مفتاح OPENAI_API_KEY"
     if isinstance(exc, APIConnectionError):
@@ -28,16 +29,23 @@ def generation_error_message(exc: Exception) -> str:
         return "تجاوز حد طلبات OpenAI — حاول لاحقاً"
 
     text = str(exc)
+    # Strip secrets that might appear in SDK error messages
+    safe_text = re.sub(r"(eyJ[A-Za-z0-9_.-]{20,})", "[TOKEN_REDACTED]", text)
+    safe_text = re.sub(r"(key|token|secret)[=:\s]+\S+", "[REDACTED]", safe_text, flags=re.I)
+    safe_text = safe_text[:500]
+
     lower = text.lower()
     if "invalid api key" in lower and "supabase" in lower:
-        return "فشل رفع الصورة إلى Supabase — تحقق من SUPABASE_SERVICE_KEY"
+        return f"فشل رفع الصورة إلى Supabase — SUPABASE_SERVICE_KEY غير صحيح | {safe_text}"
     if "invalid api key" in lower:
         return "فشل توليد الصورة من OpenAI — تحقق من مفتاح OPENAI_API_KEY"
+    if "bucket" in lower and "not found" in lower:
+        return f"فشل رفع الصورة — bucket غير موجود في Supabase | {safe_text}"
     if "bucket" in lower or "storage" in lower or "supabase" in lower:
-        return "فشل رفع الصورة إلى Supabase — تحقق من إعدادات التخزين"
+        return f"فشل رفع الصورة إلى Supabase | {safe_text}"
     if "openai" in lower:
-        return "فشل توليد الصورة من OpenAI"
-    return f"فشل توليد الصورة: {text}"
+        return f"فشل توليد الصورة من OpenAI | {safe_text}"
+    return f"فشل توليد الصورة: {safe_text}"
 
 
 def _normalize_previous_status(raw: Optional[str]) -> str:
