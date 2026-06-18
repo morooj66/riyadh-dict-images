@@ -14,7 +14,8 @@
 
 # Node artifacts
 **/node_modules/
-frontend/dist/
+# Note: frontend/dist/ must NOT be ignored — it's the pre-built React app
+# that the Dockerfile copies into the container via: COPY frontend/dist/ /app/frontend/dist/
 
 # Local MongoDB data
 backend/.local/
