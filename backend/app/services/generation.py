@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 import base64
+import logging
 from datetime import datetime, timezone
 from typing import Any, Optional
+
+logger = logging.getLogger(__name__)
 
 from bson import ObjectId
 from fastapi import HTTPException, status
@@ -156,11 +159,15 @@ async def regenerate_entry(
         )
 
         client = OpenAI(api_key=settings.openai_api_key)
-        response = client.images.generate(
-            model=settings.openai_image_model,
-            prompt=prompt,
-            size="1024x1024",
-        )
+        generate_kwargs: dict = {
+            "model": settings.openai_image_model,
+            "prompt": prompt,
+            "size": "1024x1024",
+        }
+        # gpt-image-1 returns b64_json by default; dall-e models need explicit flag
+        if settings.openai_image_model.startswith("dall-e"):
+            generate_kwargs["response_format"] = "b64_json"
+        response = client.images.generate(**generate_kwargs)
         image_b64 = response.data[0].b64_json
         if not image_b64:
             raise RuntimeError("OpenAI returned no image data")
@@ -168,8 +175,18 @@ async def regenerate_entry(
 
         version = await db[Collections.IMAGES].count_documents({"entry_id": entry_oid}) + 1
         storage_path = f"entries/{entry_id}_v{version}.png"
-        storage = SupabaseStorage()
-        upload = storage.upload_bytes(image_bytes, storage_path, content_type="image/png")
+        try:
+            storage = SupabaseStorage()
+            upload = storage.upload_bytes(image_bytes, storage_path, content_type="image/png")
+        except Exception as upload_exc:
+            # Safe log: bucket name and error type only (no keys/URLs)
+            logger.error(
+                "Supabase upload failed | bucket=%s | error_type=%s | entry=%s",
+                storage._bucket if "storage" in dir() else "?",
+                type(upload_exc).__name__,
+                entry_id,
+            )
+            raise
 
         image_doc = {
             "entry_id": entry_oid,
