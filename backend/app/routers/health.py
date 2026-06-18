@@ -4,7 +4,7 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from app.config import get_settings
 from app.db import get_async_db
 from app.dependencies import verify_api_key
-from app.schemas import HealthResponse, StatsResponse
+from app.schemas import StatsResponse
 from app.services import entries as entry_service
 
 router = APIRouter(tags=["health"])
@@ -13,11 +13,10 @@ router = APIRouter(tags=["health"])
 @router.get("/health")
 async def health() -> dict:
     """Always returns 200. Shows whether settings loaded successfully."""
-    settings_ok = True
     try:
         get_settings()
-    except Exception as exc:
-        settings_ok = False
+        return {"status": "ok", "settings_loaded": True}
+    except Exception:
         return {
             "status": "degraded",
             "settings_loaded": False,
@@ -27,7 +26,6 @@ async def health() -> dict:
                 "SUPABASE_SERVICE_KEY, OPENAI_API_KEY, API_KEY"
             ),
         }
-    return {"status": "ok", "settings_loaded": settings_ok}
 
 
 @router.get("/config")
@@ -43,6 +41,23 @@ async def get_runtime_config() -> dict:
         return {"api_key": settings.api_key}
     except Exception:
         return {"api_key": ""}
+
+
+@router.get("/db-check", dependencies=[Depends(verify_api_key)])
+async def db_check(db: AsyncIOMotorDatabase = Depends(get_async_db)) -> dict:
+    """
+    Authenticated diagnostic endpoint: returns collection counts without
+    exposing the database URI or any credentials.
+    """
+    entries_count = await db["entries"].count_documents({})
+    images_count = await db["images"].count_documents({})
+    jobs_count = await db["generation_jobs"].count_documents({})
+    return {
+        "db_connected": True,
+        "entries": entries_count,
+        "images": images_count,
+        "generation_jobs": jobs_count,
+    }
 
 
 @router.get("/stats", response_model=StatsResponse, dependencies=[Depends(verify_api_key)])
