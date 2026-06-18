@@ -5,7 +5,7 @@ fails loudly with a clear error instead of breaking mysteriously later.
 """
 from functools import lru_cache
 from typing import List
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     supabase_url: str
     supabase_service_key: str
     supabase_bucket: str = "dictionary-images"
+
+    @field_validator("supabase_bucket", "mongo_db_name", "supabase_url", mode="before")
+    @classmethod
+    def strip_whitespace(cls, v: str) -> str:
+        """Strip accidental whitespace/newlines that can sneak in via HF Secrets."""
+        return v.strip() if isinstance(v, str) else v
 
     # OpenAI
     openai_api_key: str

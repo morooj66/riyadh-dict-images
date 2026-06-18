@@ -170,8 +170,11 @@ async def storage_check() -> dict:
     # Step 1: list buckets
     try:
         buckets = client.storage.list_buckets()
-        bucket_names = [b.name if hasattr(b, "name") else b.get("name") for b in buckets]
-        bucket_exists = bucket_name in bucket_names
+        bucket_names = [
+            (b.name if hasattr(b, "name") else b.get("name", "")).strip()
+            for b in buckets
+        ]
+        bucket_exists = bucket_name.strip() in bucket_names
     except Exception as e:
         err = re.sub(r"(key|token|secret)[=:\s]+\S+", "[REDACTED]", str(e), flags=re.I)
         return {"ok": False, "step": "list_buckets", "error": type(e).__name__, "hint": err[:300]}

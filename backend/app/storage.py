@@ -31,10 +31,11 @@ class SupabaseStorage:
         settings = get_settings()
         self._settings = settings
         self._client = client or create_client(
-            settings.supabase_url,
-            settings.supabase_service_key,
+            settings.supabase_url.strip(),
+            settings.supabase_service_key.strip(),
         )
-        self._bucket = settings.supabase_bucket
+        # .strip() guards against accidental whitespace/newlines in HF Secrets
+        self._bucket = settings.supabase_bucket.strip()
 
     # ------------------------------------------------------------------
     # Bucket lifecycle
