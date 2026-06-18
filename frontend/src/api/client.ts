@@ -1,5 +1,27 @@
-const API_URL = (import.meta.env.VITE_API_URL ?? "http://127.0.0.1:8000").trim();
-const API_KEY = (import.meta.env.VITE_API_KEY ?? "").trim();
+const API_URL = (import.meta.env.VITE_API_URL ?? "").trim();
+
+// API_KEY: prefer build-time value; falls back to runtime /config fetch.
+// Using `let` so initRuntimeConfig() can update it after startup.
+let API_KEY = (import.meta.env.VITE_API_KEY ?? "").trim();
+
+/**
+ * Fetch runtime config from backend. Call this ONCE before rendering the app.
+ * This lets the frontend obtain the correct API key even when VITE_API_KEY
+ * was not set at build time (e.g. HF Spaces Docker build with no build ARGs).
+ */
+export async function initRuntimeConfig(): Promise<void> {
+  if (API_KEY) return; // already baked in at build time
+  try {
+    const res = await fetch(`${API_URL}/config`);
+    if (res.ok) {
+      const cfg = (await res.json()) as { api_key?: string };
+      if (cfg.api_key) API_KEY = cfg.api_key;
+    }
+  } catch {
+    // Silently ignore — requests will fail with 401 if key remains missing,
+    // which will surface as a user-visible error message.
+  }
+}
 
 type RequestOptions = RequestInit & { errorContext?: string; timeoutMs?: number };
 
