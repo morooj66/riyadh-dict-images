@@ -188,21 +188,26 @@ async def storage_check() -> dict:
             "hint": f"Bucket '{bucket_name}' not found. Create it in Supabase → Storage.",
         }
 
-    # Step 2: try uploading a tiny test file
+    # Step 2: try uploading a minimal 1x1 transparent PNG
+    # Smallest valid PNG: 1x1 px transparent (67 bytes)
+    import base64
+    tiny_png = base64.b64decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk"
+        "YPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+    )
     try:
-        test_path = "_diagnostic/ping.txt"
-        test_data = b"ping"
+        test_path = "_diagnostic/ping_test.png"
         client.storage.from_(bucket_name).upload(
             path=test_path,
-            file=test_data,
-            file_options={"content-type": "text/plain", "upsert": "true"},
+            file=tiny_png,
+            file_options={"content-type": "image/png", "upsert": "true"},
         )
-        # Clean up
+        # Clean up silently
         try:
             client.storage.from_(bucket_name).remove([test_path])
         except Exception:
             pass
-        return {"ok": True, "bucket": bucket_name, "upload_test": "passed"}
+        return {"ok": True, "bucket": bucket_name, "upload_test": "passed", "mime_type": "image/png"}
     except Exception as e:
         err = re.sub(r"(key|token|secret)[=:\s]+\S+", "[REDACTED]", str(e), flags=re.I)
         return {
