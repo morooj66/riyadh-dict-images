@@ -16,9 +16,12 @@
 #   CORS_ORIGINS            https://morooj234-riyadh-dict-images.hf.space
 # ────────────────────────────────────────────────────────────────────────────
 
-FROM python:3.12-slim
+FROM python:3.11-slim
 
 WORKDIR /app
+
+# Ensure up-to-date CA certificates (required for TLS connections to Atlas)
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 
 # Shared prompt package
 COPY packages/ /app/packages/
