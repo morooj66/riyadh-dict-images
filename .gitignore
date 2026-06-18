@@ -34,7 +34,15 @@ node_modules/
 # Data / backups / local MongoDB — never commit
 backend/data/
 backend/.local/
+mongo_backup/
+**/mongo_backup/
+
+# Frontend build artifacts (pre-built for HF Spaces — keep committed)
+# frontend/dist/ is intentionally NOT ignored
 
 # Logs
 *.log
 migration_*.log
+
+# OS
+Thumbs.db
