@@ -94,3 +94,7 @@ Required variables:
 
 > **Secrets are not included in this repository.**
 > Environment variables must be configured separately (locally via `.env`, on Hugging Face via Space Secrets).
+
+## Status
+
+Experimental review interface deployed on Hugging Face Spaces.
