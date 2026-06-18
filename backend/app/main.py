@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 from pathlib import Path
+import logging
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,13 +11,19 @@ from pymongo.errors import PyMongoError
 from app.config import get_settings
 from app.routers import entries, generation, health
 
+logger = logging.getLogger(__name__)
+
 # Frontend dist directory — exists in production Docker build, absent in local dev
 _FRONTEND_DIST = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    get_settings()
+    try:
+        s = get_settings()
+        logger.info("Settings loaded OK. app_env=%s", s.app_env)
+    except Exception as exc:
+        logger.error("Settings validation failed at startup: %s", exc)
     yield
 
 
@@ -26,10 +33,23 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-settings = get_settings()
+# Load settings gracefully — if a required env var is missing we still start
+# the app and serve the /health & /config endpoints so the error is diagnosable.
+try:
+    settings = get_settings()
+    _cors_origins = settings.cors_origins_list
+except Exception as _settings_error:
+    logger.error(
+        "Could not load settings (%s). "
+        "Check that all required HF Secrets are set: "
+        "MONGO_URI, SUPABASE_URL, SUPABASE_SERVICE_KEY, OPENAI_API_KEY, API_KEY",
+        _settings_error,
+    )
+    _cors_origins = ["*"]  # allow all origins so /health is reachable for debugging
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

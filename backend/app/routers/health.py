@@ -10,9 +10,24 @@ from app.services import entries as entry_service
 router = APIRouter(tags=["health"])
 
 
-@router.get("/health", response_model=HealthResponse)
-async def health() -> HealthResponse:
-    return HealthResponse()
+@router.get("/health")
+async def health() -> dict:
+    """Always returns 200. Shows whether settings loaded successfully."""
+    settings_ok = True
+    try:
+        get_settings()
+    except Exception as exc:
+        settings_ok = False
+        return {
+            "status": "degraded",
+            "settings_loaded": False,
+            "error": (
+                "Missing required environment variables. "
+                "Check HF Secrets: MONGO_URI, SUPABASE_URL, "
+                "SUPABASE_SERVICE_KEY, OPENAI_API_KEY, API_KEY"
+            ),
+        }
+    return {"status": "ok", "settings_loaded": settings_ok}
 
 
 @router.get("/config")
@@ -23,8 +38,11 @@ async def get_runtime_config() -> dict:
     JS bundle for logged-in reviewers, so this does not reduce security.
     This allows the frontend to work regardless of VITE_API_KEY at build time.
     """
-    settings = get_settings()
-    return {"api_key": settings.api_key}
+    try:
+        settings = get_settings()
+        return {"api_key": settings.api_key}
+    except Exception:
+        return {"api_key": ""}
 
 
 @router.get("/stats", response_model=StatsResponse, dependencies=[Depends(verify_api_key)])
