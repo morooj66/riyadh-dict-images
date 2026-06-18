@@ -671,3 +671,94 @@ textarea {
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Generation failure banner ─────────────────────────────────────────── */
+.gen-failure-banner {
+  background: #fef2f2;
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin: 0.5rem 0 1rem;
+  color: #991b1b;
+  font-size: 0.9rem;
+  direction: rtl;
+}
+.gen-failure-banner p { margin: 0.3rem 0 0; }
+.gen-failure-note { color: #166534; font-weight: 500; }
+
+/* ── Collapsible prompt ────────────────────────────────────────────────── */
+.prompt-details {
+  margin: 0.6rem 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.prompt-details summary {
+  cursor: pointer;
+  padding: 0.4rem 0.75rem;
+  font-weight: 600;
+  font-size: 0.85rem;
+  background: #f9fafb;
+  user-select: none;
+  direction: rtl;
+}
+.prompt-details summary:hover { background: #f3f4f6; }
+.prompt-pre {
+  margin: 0;
+  padding: 0.75rem;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 0.8rem;
+  max-height: 260px;
+  overflow-y: auto;
+  background: #fff;
+  direction: ltr;
+  text-align: left;
+}
+.prompt-details--small .prompt-pre { font-size: 0.75rem; max-height: 180px; }
+
+/* ── Generation history ────────────────────────────────────────────────── */
+.gen-history-details {
+  margin-top: 1.5rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.gen-history-details > summary {
+  cursor: pointer;
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  background: #f9fafb;
+  direction: rtl;
+  user-select: none;
+}
+.gen-history-details > summary:hover { background: #f3f4f6; }
+.gen-history-list { padding: 0.5rem 0.75rem; display: flex; flex-direction: column; gap: 0.75rem; }
+.gen-history-item {
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.6rem 0.75rem;
+  background: #fff;
+}
+.gen-history-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  direction: rtl;
+  margin-bottom: 0.3rem;
+}
+.gen-history-label { font-weight: 600; font-size: 0.85rem; font-family: monospace; }
+.gen-history-date { font-size: 0.75rem; color: #6b7280; margin-right: auto; }
+.gen-history-error {
+  font-size: 0.8rem;
+  color: #991b1b;
+  background: #fef2f2;
+  border-radius: 4px;
+  padding: 0.3rem 0.5rem;
+  margin: 0.3rem 0;
+  direction: ltr;
+}
+.gen-history-thumb { display: inline-block; margin: 0.3rem 0; }
+.history-thumb-img { width: 80px; height: 80px; object-fit: cover; border-radius: 4px; cursor: pointer; }

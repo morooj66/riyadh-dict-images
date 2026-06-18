@@ -106,6 +106,17 @@ export interface ImageSummary {
   source?: string;
 }
 
+export interface GenerationJobSummary {
+  id: string;
+  attempt_label?: string;   // "regenerate_1", "regenerate_2", …
+  status: string;           // succeeded / failed / running / rolled_back
+  error?: string;
+  prompt_used?: string;
+  image_url?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface EntryDetail {
   id: string;
   word: string;
@@ -124,6 +135,8 @@ export interface EntryDetail {
   image_count: number;
   created_at: string;
   updated_at: string;
+  last_generation_error?: string;
+  generation_history?: GenerationJobSummary[];
 }
 
 export interface PaginatedEntries {

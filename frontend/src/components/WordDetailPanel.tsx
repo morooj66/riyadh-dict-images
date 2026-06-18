@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { EntryDetail, ImageSummary } from "../api/client";
+import type { EntryDetail, GenerationJobSummary, ImageSummary } from "../api/client";
 import { ArabicWord } from "./ArabicWord";
 import { EntryImage } from "./EntryImage";
 import { ImageLightbox } from "./ImageLightbox";
@@ -93,8 +93,33 @@ export function WordDetailPanel({
   }
 
   const showCandidates = entry.status === "needs_selection" && candidates.length > 0;
+  const isGenerationFailed = entry.status === "generation_failed";
   const visualDescription = entry.object_description ?? "—";
-  const promptText = entry.base_prompt ?? entry.current_image?.prompt ?? "—";
+
+  // Best prompt to display: base_prompt on entry, or current image prompt
+  const basePrompt = entry.base_prompt ?? entry.current_image?.prompt;
+  const genHistory = entry.generation_history ?? [];
+
+  function jobStatusLabel(s: string): string {
+    if (s === "succeeded" || s === "completed") return "نجح ✓";
+    if (s === "failed" || s === "generation_failed") return "فشل ✗";
+    if (s === "rolled_back") return "مُلغى";
+    if (s === "running") return "قيد التشغيل";
+    return s;
+  }
+
+  function jobStatusClass(s: string): string {
+    if (s === "succeeded" || s === "completed") return "badge badge-approved";
+    if (s === "failed" || s === "generation_failed") return "badge badge-rejected";
+    if (s === "rolled_back") return "badge";
+    return "badge badge-generating";
+  }
+
+  function formatDate(d?: string | null): string {
+    if (!d) return "";
+    try { return new Date(d).toLocaleString("ar-SA", { dateStyle: "short", timeStyle: "short" }); }
+    catch { return d; }
+  }
 
   return (
     <section className="dict-detail">
@@ -104,6 +129,19 @@ export function WordDetailPanel({
         </h1>
         <span className={statusClass(entry.status)}>{statusLabel(entry.status)}</span>
       </header>
+
+      {/* ── Generation failure banner ───────────────────────────────────── */}
+      {isGenerationFailed && (
+        <div className="gen-failure-banner">
+          <strong>⚠ فشل التوليد</strong>
+          <p>
+            {entry.last_generation_error ?? "لم يتم حفظ سبب الفشل لهذه المحاولة."}
+          </p>
+          {entry.current_image && (
+            <p className="gen-failure-note">الصورة الأصلية محفوظة وتظهر أدناه.</p>
+          )}
+        </div>
+      )}
 
       <div className="detail-body">
         <div className="detail-info">
@@ -121,23 +159,32 @@ export function WordDetailPanel({
               <dd className="text-block ltr-text">{visualDescription}</dd>
             </div>
             <div>
-              <dt>البرومت</dt>
-              <dd className="text-block prompt-block ltr-text">{promptText}</dd>
-            </div>
-            <div>
               <dt>عدد المحاولات</dt>
               <dd>{entry.image_count}</dd>
             </div>
           </dl>
+
+          {/* ── Collapsible prompt ────────────────────────────────────────── */}
+          {basePrompt && (
+            <details className="prompt-details">
+              <summary>البرومبت الأصلي</summary>
+              <pre className="prompt-pre ltr-text">{basePrompt}</pre>
+            </details>
+          )}
 
           {entry.rejection_reason && (
             <p className="note-box arabic-text">
               <strong>سبب الرفض:</strong> {entry.rejection_reason}
             </p>
           )}
+          {entry.reviewer_vision && (
+            <p className="note-box arabic-text">
+              <strong>تصور المراجع:</strong> {entry.reviewer_vision}
+            </p>
+          )}
           {entry.notes && (
             <p className="note-box arabic-text">
-              <strong>ملاحظة المراجع:</strong> {entry.notes}
+              <strong>ملاحظة:</strong> {entry.notes}
             </p>
           )}
 
@@ -187,6 +234,7 @@ export function WordDetailPanel({
         </div>
       </div>
 
+      {/* ── Candidates ─────────────────────────────────────────────────── */}
       {showCandidates && (
         <section className="candidates-section">
           <h2>الصور المرشحة</h2>
@@ -206,9 +254,7 @@ export function WordDetailPanel({
                     })
                   }
                 />
-                <p className="image-zoom-hint" style={{ fontSize: "0.72rem" }}>
-                  اضغط لتكبير
-                </p>
+                <p className="image-zoom-hint" style={{ fontSize: "0.72rem" }}>اضغط لتكبير</p>
                 <div className="image-meta">
                   <span className="badge badge-needs_selection">
                     {imageDisplayLabel(img, "مرشحة")}
@@ -233,6 +279,57 @@ export function WordDetailPanel({
             ))}
           </div>
         </section>
+      )}
+
+      {/* ── Generation history log ─────────────────────────────────────── */}
+      {genHistory.length > 0 && (
+        <details className="gen-history-details">
+          <summary>سجل التوليد ({genHistory.length} محاولة)</summary>
+          <div className="gen-history-list">
+            {genHistory.map((job: GenerationJobSummary, idx: number) => (
+              <div key={job.id} className="gen-history-item">
+                <div className="gen-history-header">
+                  <span className="gen-history-label">
+                    {job.attempt_label ?? `محاولة ${idx + 1}`}
+                  </span>
+                  <span className={jobStatusClass(job.status)}>
+                    {jobStatusLabel(job.status)}
+                  </span>
+                  {job.created_at && (
+                    <span className="gen-history-date">{formatDate(job.created_at)}</span>
+                  )}
+                </div>
+                {job.error && (
+                  <p className="gen-history-error">
+                    <strong>سبب الفشل:</strong> {job.error}
+                  </p>
+                )}
+                {job.image_url && (
+                  <div className="gen-history-thumb">
+                    <EntryImage
+                      publicUrl={job.image_url}
+                      alt={job.attempt_label ?? ""}
+                      className="history-thumb-img"
+                      onClick={() =>
+                        setLightbox({
+                          publicUrl: job.image_url!,
+                          label: job.attempt_label ?? `محاولة ${idx + 1}`,
+                        })
+                      }
+                    />
+                    <p className="image-zoom-hint" style={{ fontSize: "0.7rem" }}>تكبير</p>
+                  </div>
+                )}
+                {job.prompt_used && (
+                  <details className="prompt-details prompt-details--small">
+                    <summary>البرومبت المستخدم</summary>
+                    <pre className="prompt-pre ltr-text">{job.prompt_used}</pre>
+                  </details>
+                )}
+              </div>
+            ))}
+          </div>
+        </details>
       )}
 
       {message && <p className="success">{message}</p>}

@@ -62,7 +62,7 @@ async def list_entries(
         db[Collections.ENTRIES]
         .find(query, {"word": 1, "definition": 1, "category": 1, "status": 1,
                       "prompt_family": 1, "current_image_id": 1, "updated_at": 1, "created_at": 1})
-        .sort([("updated_at", -1), ("_id", -1)])
+        .sort([("word", 1), ("_id", 1)])
         .skip(skip)
         .limit(page_size)
     )
@@ -105,6 +105,52 @@ async def get_entry(db: AsyncIOMotorDatabase, entry_id: str) -> dict[str, Any]:
         if img:
             current_image = serialize_image(img, selected_id=doc.get("selected_image_id"))
 
+    # ── Generation history ──────────────────────────────────────────────────
+    gen_history = []
+    last_generation_error: Optional[str] = None
+
+    async for job in db[Collections.GENERATION_JOBS].find(
+        {"entry_id": entry_oid}
+    ).sort("created_at", 1):
+        job_img_url: Optional[str] = None
+        prompt_used: Optional[str] = None
+        raw_img_id = job.get("image_id")
+        if raw_img_id:
+            img_oid = raw_img_id if not isinstance(raw_img_id, str) else (
+                ObjectId(raw_img_id) if len(raw_img_id) == 24 else None
+            )
+            if img_oid:
+                job_img = await db[Collections.IMAGES].find_one({"_id": img_oid})
+                if job_img:
+                    serialized = serialize_image(job_img, selected_id=None)
+                    job_img_url = serialized.get("public_url")
+                    prompt_used = job_img.get("prompt")
+
+        job_status = job.get("status") or "unknown"
+        # Normalise rolled_back jobs
+        if job.get("rolled_back"):
+            job_status = "rolled_back"
+
+        job_error = (
+            job.get("error")
+            or job.get("error_message")
+            or job.get("failure_reason")
+        )
+
+        if job_status in ("failed", "generation_failed") and job_error:
+            last_generation_error = job_error
+
+        gen_history.append({
+            "id": str(job["_id"]),
+            "attempt_label": job.get("generation_label"),
+            "status": job_status,
+            "error": job_error,
+            "prompt_used": prompt_used,
+            "image_url": job_img_url,
+            "created_at": job.get("created_at"),
+            "updated_at": job.get("updated_at"),
+        })
+
     return {
         "id": str(doc["_id"]),
         "word": doc["word"],
@@ -123,6 +169,8 @@ async def get_entry(db: AsyncIOMotorDatabase, entry_id: str) -> dict[str, Any]:
         "image_count": image_count,
         "created_at": doc.get("created_at"),
         "updated_at": doc.get("updated_at"),
+        "last_generation_error": last_generation_error,
+        "generation_history": gen_history,
     }
 
 

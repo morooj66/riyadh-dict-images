@@ -63,6 +63,17 @@ class ImageSummary(BaseModel):
     source: Optional[str] = None
 
 
+class GenerationJobSummary(BaseModel):
+    id: str
+    attempt_label: Optional[str] = None   # e.g. "regenerate_1"
+    status: str                            # succeeded / failed / running
+    error: Optional[str] = None
+    prompt_used: Optional[str] = None     # prompt taken from the resulting image
+    image_url: Optional[str] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+
 class EntryDetail(BaseModel):
     id: str
     word: str
@@ -81,6 +92,9 @@ class EntryDetail(BaseModel):
     image_count: int = 0
     created_at: datetime
     updated_at: datetime
+    # Generation diagnostics
+    last_generation_error: Optional[str] = None
+    generation_history: list[GenerationJobSummary] = []
 
 
 class PaginatedEntries(BaseModel):
