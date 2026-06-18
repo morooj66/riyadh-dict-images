@@ -95,32 +95,60 @@ async def db_ping() -> dict:
     else:
         uri_type = "other"
 
-    try:
-        client = AsyncIOMotorClient(uri, serverSelectionTimeoutMS=8000)
-        await asyncio.wait_for(
-            client.admin.command("ping"),
-            timeout=9.0,
-        )
-        client.close()
-        return {"connected": True, "uri_type": uri_type}
-    except asyncio.TimeoutError:
+    # Try 1: normal TLS (as configured)
+    result_normal = await _try_mongo_ping(uri, tls_insecure=False)
+
+    if result_normal["connected"]:
+        return {"connected": True, "uri_type": uri_type, "tls_mode": "normal"}
+
+    # Try 2: relaxed TLS (to distinguish TLS cert issue from IP block)
+    result_insecure = await _try_mongo_ping(uri, tls_insecure=True)
+
+    if result_insecure["connected"]:
         return {
             "connected": False,
             "uri_type": uri_type,
-            "error_type": "timeout",
-            "hint": "Atlas IP Access List likely blocking HF Spaces. Add 0.0.0.0/0 in Atlas → Network Access.",
+            "tls_mode": "normal_fails_insecure_ok",
+            "error_type": result_normal["error_type"],
+            "hint": "TLS certificate verification failing. Try adding ?tls=true&tlsAllowInvalidCertificates=true to MONGO_URI in HF Secrets.",
+            "normal_error": result_normal["hint"][:200],
         }
+
+    # Both fail — likely IP access list
+    return {
+        "connected": False,
+        "uri_type": uri_type,
+        "tls_mode": "both_fail",
+        "error_type": result_normal["error_type"],
+        "hint": (
+            "Both normal and insecure TLS failed. "
+            "Most likely cause: MongoDB Atlas IP Access List is blocking HF Spaces. "
+            "Fix: Atlas → Network Access → Add IP Address → Allow Access From Anywhere (0.0.0.0/0)."
+        ),
+        "normal_error": result_normal["hint"][:200],
+        "insecure_error": result_insecure["hint"][:200],
+    }
+
+
+async def _try_mongo_ping(uri: str, tls_insecure: bool) -> dict:
+    import asyncio
+    from motor.motor_asyncio import AsyncIOMotorClient
+    import re
+    kwargs: dict = {"serverSelectionTimeoutMS": 7000}
+    if tls_insecure:
+        kwargs["tlsAllowInvalidCertificates"] = True
+        kwargs["tlsAllowInvalidHostnames"] = True
+    try:
+        client = AsyncIOMotorClient(uri, **kwargs)
+        await asyncio.wait_for(client.admin.command("ping"), timeout=8.0)
+        client.close()
+        return {"connected": True, "error_type": None, "hint": ""}
+    except asyncio.TimeoutError:
+        return {"connected": False, "error_type": "TimeoutError", "hint": "connection timed out"}
     except Exception as exc:
         err = str(exc)
-        # Strip any URI that might appear in error message
-        import re
-        err_safe = re.sub(r"mongodb(\+srv)?://[^\s]+", "[URI_REDACTED]", err)
-        return {
-            "connected": False,
-            "uri_type": uri_type,
-            "error_type": type(exc).__name__,
-            "hint": err_safe[:300],
-        }
+        err_safe = re.sub(r"mongodb(\+srv)?://[^\s@]+@?", "[URI_REDACTED]://", err)
+        return {"connected": False, "error_type": type(exc).__name__, "hint": err_safe[:300]}
 
 
 @router.get("/stats", response_model=StatsResponse, dependencies=[Depends(verify_api_key)])
