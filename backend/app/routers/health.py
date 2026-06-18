@@ -52,12 +52,75 @@ async def db_check(db: AsyncIOMotorDatabase = Depends(get_async_db)) -> dict:
     entries_count = await db["entries"].count_documents({})
     images_count = await db["images"].count_documents({})
     jobs_count = await db["generation_jobs"].count_documents({})
+    # quick data integrity: entries without valid current_image_id
+    broken = await db["entries"].count_documents({"current_image_id": None})
+    # orphan images (not linked to any entry)
+    entry_ids = await db["entries"].distinct("_id")
+    orphan = await db["images"].count_documents(
+        {"entry_id": {"$nin": entry_ids}, "image_role": "original"}
+    )
     return {
         "db_connected": True,
         "entries": entries_count,
         "images": images_count,
         "generation_jobs": jobs_count,
+        "broken_current_image_id": broken,
+        "orphan_images": orphan,
     }
+
+
+@router.get("/db-ping")
+async def db_ping() -> dict:
+    """
+    Public diagnostic: attempts a DB ping and returns connectivity status.
+    Does NOT expose MONGO_URI or any credentials.
+    Useful when /db-check returns 503 to understand the error type.
+    """
+    import asyncio
+    from motor.motor_asyncio import AsyncIOMotorClient
+    from app.config import get_settings
+    try:
+        settings = get_settings()
+    except Exception as exc:
+        return {"connected": False, "error_type": "settings_missing", "hint": str(exc)[:200]}
+
+    # Detect URI type without revealing it
+    uri = settings.mongo_uri
+    if "localhost" in uri or "127.0.0.1" in uri:
+        uri_type = "localhost"
+    elif "mongodb+srv" in uri:
+        uri_type = "atlas_srv"
+    elif "mongodb.net" in uri:
+        uri_type = "atlas"
+    else:
+        uri_type = "other"
+
+    try:
+        client = AsyncIOMotorClient(uri, serverSelectionTimeoutMS=8000)
+        await asyncio.wait_for(
+            client.admin.command("ping"),
+            timeout=9.0,
+        )
+        client.close()
+        return {"connected": True, "uri_type": uri_type}
+    except asyncio.TimeoutError:
+        return {
+            "connected": False,
+            "uri_type": uri_type,
+            "error_type": "timeout",
+            "hint": "Atlas IP Access List likely blocking HF Spaces. Add 0.0.0.0/0 in Atlas → Network Access.",
+        }
+    except Exception as exc:
+        err = str(exc)
+        # Strip any URI that might appear in error message
+        import re
+        err_safe = re.sub(r"mongodb(\+srv)?://[^\s]+", "[URI_REDACTED]", err)
+        return {
+            "connected": False,
+            "uri_type": uri_type,
+            "error_type": type(exc).__name__,
+            "hint": err_safe[:300],
+        }
 
 
 @router.get("/stats", response_model=StatsResponse, dependencies=[Depends(verify_api_key)])
